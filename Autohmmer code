@@ -111,11 +111,11 @@ import re
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 
-# ── Load hit IDs ──────────────────────────────────────────────────────────────
+#Load hit IDs
 with open("$TEMP_IDS") as f:
     hit_ids = set(line.strip() for line in f if line.strip())
 
-# ── Parse tblout for e-value, score, bias, description ───────────────────────
+#Parse tblout for e-value, score, bias, description
 tbl_data = {}   # seq_id -> dict of stats
 with open("$TBL_FILE") as f:
     for line in f:
@@ -136,7 +136,7 @@ with open("$TBL_FILE") as f:
             "description": description,
         }
 
-# ── Parse FASTA and collect matching sequences ────────────────────────────────
+#Parse FASTA and collect matching sequences
 sequences = {}  # seq_id -> {"header": ..., "sequence": ...}
 current_id  = None
 current_seq = []
@@ -158,19 +158,19 @@ with open("$TARGET_DB") as f:
         else:
             current_seq.append(line)
 
-# Catch the final record
+#Catch the final record
 if current_id and current_id in hit_ids:
     sequences[current_id] = {
         "header":   current_header,
         "sequence": "".join(current_seq),
     }
 
-# ── Build xlsx ────────────────────────────────────────────────────────────────
+#Build xlsx
 wb = openpyxl.Workbook()
 ws = wb.active
 ws.title = "HMM Hits"
 
-# Header style
+#Header style- creates header for the output table 
 header_font    = Font(bold=True, color="FFFFFF")
 header_fill    = PatternFill("solid", fgColor="2E6DA4")
 center_align   = Alignment(horizontal="center", vertical="center", wrap_text=True)
@@ -188,7 +188,7 @@ for col_idx, (header, width) in enumerate(zip(headers, col_widths), start=1):
 
 ws.row_dimensions[1].height = 20
 
-# Data rows
+#Data rows
 found_in_fasta = 0
 missing_seqs   = []
 
@@ -229,7 +229,7 @@ for row_idx, seq_id in enumerate(hit_ids, start=2):
 
 ws.freeze_panes = "A2"  # Keep header visible when scrolling
 
-# ── Summary sheet ─────────────────────────────────────────────────────────────
+#Summary sheet
 ws2 = wb.create_sheet(title="Summary")
 summary_rows = [
     ("HMM Profile",              "$HMM_PROFILE"),
@@ -260,7 +260,7 @@ if missing_seqs:
         print(f"    - {m}")
 PYEOF
 
-            # Check Python ran successfully
+            #Check Python ran successfully
             if [[ $? -eq 0 ]]; then
                 echo "-------------------------------------------"
                 echo "Extraction complete!"
