@@ -1,16 +1,18 @@
 #!/bin/zsh
+# Welcomes user to the autohmmer model
 echo "Welcome to the automated Hidden Markov Model search tool!" 
 echo "Before we get started, please check you are in the correct directory" 
 
-pwd  #prints working directory  
+pwd  #prints working directory to make sure that user is in the right directory as their files  
 
-#Righting a function to ask yes/no statement 
+# Righting a function to ask yes/no statement 
 ask_yes_no() {
 local question="$1"
 while true; do
 print  - n "$question [y/n]: " 
 read -r answer
 case "$answer" in
+# Writing how yes and no can appear and links them to function, this makes yes and no not case sensitive.
 [Yy]|[Yy][Ee][Ss]) return 0;; #Yes -> return 0 (True)
 [Nn]|[Nn][Oo]) return 1;; #No -> return 1(false) 
 *) echo "Please enter yes or no";;
@@ -18,51 +20,61 @@ esac
 done
 }
 
-#Askes user if they have need to install conda, if they say yes then it installs conda, if no then it skips this step
+# Asks user if they have need to install conda, if they say yes then it installs conda, if no then it skips this step
 if ask_yes_no "Do you need to install conda?";then
 echo "Installing conda.."
-#Download the installer
+# Download the installer
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-#Run the installer (silent mode)
+# Run the installer (silent mode)
 bash miniconda.sh -b -p $HOME/miniconda3
-#Initialize conda
+# Initialize conda
 $HOME/miniconda3/bin/conda init bash
-#Apply changes to current session
+# Apply changes to current session
 source ~/.bashrc
 echo "Conda installed" #lets them know conda is installed  
 else
 echo "Great! Moving onto HMMER install" #lets them know they are moving to the next step
 fi 
 
-#Installing hmmer for hmmsearch and hmmbuild
+# Installing hmmer for hmmsearch and hmmbuild
+# Asks user if they need to install HMMER suite which is needed to run code, if yes then it installs, if no then it skips to start HMMbuild
 if ask_yes_no "Do you need to install hmmer";then
 echo "Installing HMMER suite"
-conda install -y -c bioconda -c conda-forge hmmer && hmmbuild -h | head -3
+conda install -y -c bioconda -c conda-forge hmmer && hmmbuild -h | head -3 #installs HMMER suite
 echo "HMMER suite installed"
 else
 echo "Great! Now we can start!"
 fi
 
 echo "Starting HMMbuild"
-#Prompts user to run hmmbuild 
+# Prompts user to run hmmbuild 
+# Asks user if they have the correct input files, if they answer no it gives the link to the online MSA tool
 if ask_yes_no "Do have you a mulitple sequence alignment file, this will be .fasta or .faa"; then 
-read -r "HMM_OUT?Great, let's begin making your model, Please enter output profile name (ex. output.hmm):"
+# Prompts user to name the file the HMMbuild with put out, also tells them to end it with .hmm so it creates the correct file type
+read -r "HMM_OUT?Great, let's begin making your model, Please enter output profile name with .hmm at the end (ex. output.hmm):"
+# Prompts user to input a .fasta file from the MSA 
 read -r "MSA_FILE?Now enter your input MSA file (ex. alignment.fasta):"
 echo "Running hmmbuild..."
-hmmbuild "$HMM_OUT" "$MSA_FILE"
-echo "Done! Profile saved to: $HMM_OUT"
+hmmbuild "$HMM_OUT" "$MSA_FILE" # builds the HMMbuild .hmm file
+echo "Done! Profile saved to: $HMM_OUT" 
 else
 echo "Please run a mulitple sequence alignment, https://www.ebi.ac.uk/jdispatcher/msa, before proceeding"
 fi
 
 echo "Starting HMMsearch"
-#start hmmsearch 
+# Start HMMsearch 
+# Asks user if they see the created .hmm file if yes, code continues
 if ask_yes_no "Can you see the new  .hmm file in your directory"; then
+# Asks user if they have a .fasta file to use and search with
 if ask_yes_no "Do you have a target sequence database file (.fasta or .faa) to search against?:"; then 
+# Prompts user to input the .hmm they created
 read -r "HMM_PROFILE?Enter your HMM profile file (ex. output.hmm):"
+# Prompts user to input the MSA .fasta file
 read -r "TARGET_DB?Enter your target sequence database file (ex. sequences.fasta):"
-read -r "SEARCH_OUT?Enter your desired output results file name (ex. search_results.txt):"
+# Prompts user to input the file name they would like and asks them to end name with .txt
+read -r "SEARCH_OUT?Enter your desired output results file name, end name with .txt to ensure correct file type (ex. search_results.txt):"
 echo "Running hmmsearch..."
+# Takes inputs and runs a HMMsearch
 hmmsearch --tblout "${SEARCH_OUT%.txt}_tbl.txt" "$HMM_PROFILE" "$TARGET_DB" > "$SEARCH_OUT"
 echo "Done! Full results saved to: $SEARCH_OUT"
 echo "Tab-delimited hits saved to: ${SEARCH_OUT%.txt}_tbl.txt"
@@ -74,10 +86,10 @@ else
 echo "No HMM profile found. Please run HMMbuild first to generate a profile, or provide an existing .hmm file."
 fi
 
-#takes the sequences found in HMMsearch and outputs them into a xlsx file
 echo "Starting Sequence Extraction"
 
-#Extract sequences from HMMsearch results into an xlsx file
+# Takes the sequences found in HMMsearch and outputs them into a xlsx file
+# Asks user is they want the extracted sequences from HMMsearch results into an xlsx file
 if ask_yes_no "Would you like to extract the matched sequences into an Excel (.xlsx) file?"; then
 
     #Check that the tblout file exists
@@ -111,11 +123,11 @@ import re
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 
-#Load hit IDs
+# Load hit IDs
 with open("$TEMP_IDS") as f:
     hit_ids = set(line.strip() for line in f if line.strip())
 
-#Parse tblout for e-value, score, bias, description
+# Parse tblout for e-value, score, bias, description
 tbl_data = {}   # seq_id -> dict of stats
 with open("$TBL_FILE") as f:
     for line in f:
@@ -136,7 +148,7 @@ with open("$TBL_FILE") as f:
             "description": description,
         }
 
-#Parse FASTA and collect matching sequences
+# Parse FASTA and collect matching sequences
 sequences = {}  # seq_id -> {"header": ..., "sequence": ...}
 current_id  = None
 current_seq = []
@@ -158,14 +170,14 @@ with open("$TARGET_DB") as f:
         else:
             current_seq.append(line)
 
-#Catch the final record
+# Catch the final record
 if current_id and current_id in hit_ids:
     sequences[current_id] = {
         "header":   current_header,
         "sequence": "".join(current_seq),
     }
 
-#Build xlsx
+# Build xlsx
 wb = openpyxl.Workbook()
 ws = wb.active
 ws.title = "HMM Hits"
@@ -188,7 +200,7 @@ for col_idx, (header, width) in enumerate(zip(headers, col_widths), start=1):
 
 ws.row_dimensions[1].height = 20
 
-#Data rows
+# Data rows
 found_in_fasta = 0
 missing_seqs   = []
 
@@ -229,7 +241,7 @@ for row_idx, seq_id in enumerate(hit_ids, start=2):
 
 ws.freeze_panes = "A2"  # Keep header visible when scrolling
 
-#Summary sheet
+# Summary sheet
 ws2 = wb.create_sheet(title="Summary")
 summary_rows = [
     ("HMM Profile",              "$HMM_PROFILE"),
@@ -260,7 +272,7 @@ if missing_seqs:
         print(f"    - {m}")
 PYEOF
 
-            #Check Python ran successfully
+            # Check Python ran successfully
             if [[ $? -eq 0 ]]; then
                 echo "-------------------------------------------"
                 echo "Extraction complete!"
