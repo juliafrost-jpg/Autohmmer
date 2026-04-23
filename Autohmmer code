@@ -1,0 +1,282 @@
+#!/bin/zsh
+echo "Welcome to the automated Hidden Markov Model search tool!" 
+echo "Before we get started, please check you are in the correct directory" 
+
+pwd  #prints working directory  
+
+#Righting a function to ask yes/no statement 
+ask_yes_no() {
+local question="$1"
+while true; do
+print  - n "$question [y/n]: " 
+read -r answer
+case "$answer" in
+[Yy]|[Yy][Ee][Ss]) return 0;; #Yes -> return 0 (True)
+[Nn]|[Nn][Oo]) return 1;; #No -> return 1(false) 
+*) echo "Please enter yes or no";;
+esac
+done
+}
+
+#Askes user if they have need to install conda, if they say yes then it installs conda, if no then it skips this step
+if ask_yes_no "Do you need to install conda?";then
+echo "Installing conda.."
+#Download the installer
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+#Run the installer (silent mode)
+bash miniconda.sh -b -p $HOME/miniconda3
+#Initialize conda
+$HOME/miniconda3/bin/conda init bash
+#Apply changes to current session
+source ~/.bashrc
+echo "Conda installed" #lets them know conda is installed  
+else
+echo "Great! Moving onto HMMER install" #lets them know they are moving to the next step
+fi 
+
+#Installing hmmer for hmmsearch and hmmbuild
+if ask_yes_no "Do you need to install hmmer";then
+echo "Installing HMMER suite"
+conda install -y -c bioconda -c conda-forge hmmer && hmmbuild -h | head -3
+echo "HMMER suite installed"
+else
+echo "Great! Now we can start!"
+fi
+
+echo "Starting HMMbuild"
+#Prompts user to run hmmbuild 
+if ask_yes_no "Do have you a mulitple sequence alignment file, this will be .fasta or .faa"; then 
+read -r "HMM_OUT?Great, let's begin making your model, Please enter output profile name (ex. output.hmm):"
+read -r "MSA_FILE?Now enter your input MSA file (ex. alignment.fasta):"
+echo "Running hmmbuild..."
+hmmbuild "$HMM_OUT" "$MSA_FILE"
+echo "Done! Profile saved to: $HMM_OUT"
+else
+echo "Please run a mulitple sequence alignment, https://www.ebi.ac.uk/jdispatcher/msa, before proceeding"
+fi
+
+echo "Starting HMMsearch"
+#start hmmsearch 
+if ask_yes_no "Can you see the new  .hmm file in your directory"; then
+if ask_yes_no "Do you have a target sequence database file (.fasta or .faa) to search against?:"; then 
+read -r "HMM_PROFILE?Enter your HMM profile file (ex. output.hmm):"
+read -r "TARGET_DB?Enter your target sequence database file (ex. sequences.fasta):"
+read -r "SEARCH_OUT?Enter your desired output results file name (ex. search_results.txt):"
+echo "Running hmmsearch..."
+hmmsearch --tblout "${SEARCH_OUT%.txt}_tbl.txt" "$HMM_PROFILE" "$TARGET_DB" > "$SEARCH_OUT"
+echo "Done! Full results saved to: $SEARCH_OUT"
+echo "Tab-delimited hits saved to: ${SEARCH_OUT%.txt}_tbl.txt"
+else 
+echo "Please provide a target sequence database in FASTA format before proceeding."
+echo "You can download sequences from: https://www.uniprot.org/ or https://www.ncbi.nlm.nih.gov/"
+fi 
+else
+echo "No HMM profile found. Please run HMMbuild first to generate a profile, or provide an existing .hmm file."
+fi
+
+#takes the sequences found in HMMsearch and outputs them into a xlsx file
+echo "Starting Sequence Extraction"
+
+#Extract sequences from HMMsearch results into an xlsx file
+if ask_yes_no "Would you like to extract the matched sequences into an Excel (.xlsx) file?"; then
+
+    #Check that the tblout file exists
+    TBL_FILE="${SEARCH_OUT%.txt}_tbl.txt"
+
+    if [[ ! -f "$TBL_FILE" ]]; then
+        echo "Error: Table output file '$TBL_FILE' not found. Please ensure HMMsearch ran successfully."
+    else
+        echo "Extracting hit sequence IDs from: $TBL_FILE"
+
+        # Pull sequence IDs from tblout (column 1, skipping comment lines)
+        HIT_IDS=$(grep -v "^#" "$TBL_FILE" | awk '{print $1}')
+
+        if [[ -z "$HIT_IDS" ]]; then
+            echo "No hits found in $TBL_FILE. Exiting extraction."
+        else
+            HIT_COUNT=$(echo "$HIT_IDS" | wc -l | tr -d ' ')
+            echo "Found $HIT_COUNT hit(s). Extracting sequences from: $TARGET_DB"
+
+            # Write hit IDs to a temp file for lookup
+            TEMP_IDS=$(mktemp /tmp/hit_ids_XXXXXX.txt)
+            echo "$HIT_IDS" > "$TEMP_IDS"
+
+            # Extract matching sequences from the FASTA database using Python
+            # Also builds the xlsx at the same time
+            read -r "XLSX_OUT?Enter the output Excel file name (ex. hits.xlsx):"
+
+            python3 - <<PYEOF
+import sys
+import re
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment
+
+# ── Load hit IDs ──────────────────────────────────────────────────────────────
+with open("$TEMP_IDS") as f:
+    hit_ids = set(line.strip() for line in f if line.strip())
+
+# ── Parse tblout for e-value, score, bias, description ───────────────────────
+tbl_data = {}   # seq_id -> dict of stats
+with open("$TBL_FILE") as f:
+    for line in f:
+        if line.startswith("#") or not line.strip():
+            continue
+        cols = line.split()
+        if len(cols) < 19:
+            continue
+        seq_id      = cols[0]
+        e_value     = cols[4]   # full-sequence E-value
+        score       = cols[5]   # full-sequence score
+        bias        = cols[6]   # full-sequence bias
+        description = " ".join(cols[18:]) if len(cols) > 18 else "N/A"
+        tbl_data[seq_id] = {
+            "e_value": e_value,
+            "score": score,
+            "bias": bias,
+            "description": description,
+        }
+
+# ── Parse FASTA and collect matching sequences ────────────────────────────────
+sequences = {}  # seq_id -> {"header": ..., "sequence": ...}
+current_id  = None
+current_seq = []
+
+with open("$TARGET_DB") as f:
+    for line in f:
+        line = line.rstrip()
+        if line.startswith(">"):
+            # Save previous sequence if it was a hit
+            if current_id and current_id in hit_ids:
+                sequences[current_id] = {
+                    "header":   current_header,
+                    "sequence": "".join(current_seq),
+                }
+            # Start new record — id is the first word after ">"
+            current_header = line[1:]
+            current_id     = current_header.split()[0]
+            current_seq    = []
+        else:
+            current_seq.append(line)
+
+# Catch the final record
+if current_id and current_id in hit_ids:
+    sequences[current_id] = {
+        "header":   current_header,
+        "sequence": "".join(current_seq),
+    }
+
+# ── Build xlsx ────────────────────────────────────────────────────────────────
+wb = openpyxl.Workbook()
+ws = wb.active
+ws.title = "HMM Hits"
+
+# Header style
+header_font    = Font(bold=True, color="FFFFFF")
+header_fill    = PatternFill("solid", fgColor="2E6DA4")
+center_align   = Alignment(horizontal="center", vertical="center", wrap_text=True)
+left_align     = Alignment(horizontal="left",   vertical="top",    wrap_text=True)
+
+headers = ["Sequence ID", "E-value", "Score", "Bias", "Description", "FASTA Header", "Sequence", "Sequence Length"]
+col_widths = [20, 12, 10, 10, 30, 40, 60, 16]
+
+for col_idx, (header, width) in enumerate(zip(headers, col_widths), start=1):
+    cell = ws.cell(row=1, column=col_idx, value=header)
+    cell.font      = header_font
+    cell.fill      = header_fill
+    cell.alignment = center_align
+    ws.column_dimensions[cell.column_letter].width = width
+
+ws.row_dimensions[1].height = 20
+
+# Data rows
+found_in_fasta = 0
+missing_seqs   = []
+
+for row_idx, seq_id in enumerate(hit_ids, start=2):
+    stats = tbl_data.get(seq_id, {})
+    seq_info = sequences.get(seq_id)
+
+    if seq_info:
+        found_in_fasta += 1
+        fasta_header = seq_info["header"]
+        sequence     = seq_info["sequence"]
+        seq_length   = len(sequence)
+    else:
+        missing_seqs.append(seq_id)
+        fasta_header = "Not found in database"
+        sequence     = "N/A"
+        seq_length   = 0
+
+    row_data = [
+        seq_id,
+        stats.get("e_value",     "N/A"),
+        stats.get("score",       "N/A"),
+        stats.get("bias",        "N/A"),
+        stats.get("description", "N/A"),
+        fasta_header,
+        sequence,
+        seq_length,
+    ]
+
+    # Alternating row shading
+    fill_colour = "EAF2FB" if row_idx % 2 == 0 else "FFFFFF"
+    row_fill = PatternFill("solid", fgColor=fill_colour)
+
+    for col_idx, value in enumerate(row_data, start=1):
+        cell = ws.cell(row=row_idx, column=col_idx, value=value)
+        cell.fill      = row_fill
+        cell.alignment = left_align
+
+ws.freeze_panes = "A2"  # Keep header visible when scrolling
+
+# ── Summary sheet ─────────────────────────────────────────────────────────────
+ws2 = wb.create_sheet(title="Summary")
+summary_rows = [
+    ("HMM Profile",              "$HMM_PROFILE"),
+    ("Target Database",          "$TARGET_DB"),
+    ("HMMsearch Results File",   "$SEARCH_OUT"),
+    ("Total Hits (tblout)",      len(hit_ids)),
+    ("Sequences Extracted",      found_in_fasta),
+    ("Sequences Not in FASTA",   len(missing_seqs)),
+]
+for r, (label, value) in enumerate(summary_rows, start=1):
+    ws2.cell(row=r, column=1, value=label).font  = Font(bold=True)
+    ws2.cell(row=r, column=2, value=str(value))
+ws2.column_dimensions["A"].width = 28
+ws2.column_dimensions["B"].width = 45
+
+if missing_seqs:
+    ws2.cell(row=len(summary_rows)+2, column=1, value="Missing Sequence IDs").font = Font(bold=True)
+    for i, mid in enumerate(missing_seqs, start=len(summary_rows)+3):
+        ws2.cell(row=i, column=1, value=mid)
+
+wb.save("$XLSX_OUT")
+print(f"Excel file saved: $XLSX_OUT")
+print(f"  Hits recorded : {len(hit_ids)}")
+print(f"  Sequences found in FASTA: {found_in_fasta}")
+if missing_seqs:
+    print(f"  Warning — {len(missing_seqs)} ID(s) not found in the FASTA database:")
+    for m in missing_seqs:
+        print(f"    - {m}")
+PYEOF
+
+            # Check Python ran successfully
+            if [[ $? -eq 0 ]]; then
+                echo "-------------------------------------------"
+                echo "Extraction complete!"
+                echo "Excel file: $XLSX_OUT"
+                echo "  - 'HMM Hits' sheet : sequences + statistics"
+                echo "  - 'Summary' sheet  : run metadata"
+                echo "-------------------------------------------"
+            else
+                echo "Error: Python extraction failed. Ensure openpyxl is installed:"
+                echo "  pip install openpyxl   OR   conda install -c conda-forge openpyxl"
+            fi
+
+            # Clean up temp file
+            rm -f "$TEMP_IDS"
+        fi
+    fi
+else
+    echo "Skipping sequence extraction. Pipeline complete."
+fi
