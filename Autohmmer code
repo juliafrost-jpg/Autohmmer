@@ -24,17 +24,13 @@ if ask_yes_no "Do you need to install conda?"; then
     echo "Installing conda.."
     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
     bash miniconda.sh -b -p $HOME/miniconda3
-    $HOME/miniconda3/bin/conda init bash
-    source ~/.bashrc
-    export PATH="$HOME/miniconda3/bin:$PATH"
+    source $HOME/miniconda3/etc/profile.d/conda.sh
     conda activate base
     echo "Conda installed"
 else
     echo "Great! Moving onto HMMER install"
-    # Activate existing conda installation
-    export PATH="$HOME/miniconda3/bin:$PATH"
-    source ~/.bashrc
-    conda activate base 2>/dev/null || true
+    source $HOME/miniconda3/etc/profile.d/conda.sh
+    conda activate base
 fi
 
 # Installing hmmer
