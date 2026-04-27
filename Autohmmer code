@@ -54,6 +54,11 @@ echo "Please run a multiple sequence alignment, https://www.ebi.ac.uk/jdispatche
 fi
 
 echo "Starting HMMsearch"
+echo "-------------------------------------------"
+echo "Current directory: $(pwd)"
+echo "Files in this directory:"
+ls -lh
+echo "-------------------------------------------"
 if ask_yes_no "Can you see the new .hmm file in your directory?"; then
 if ask_yes_no "Do you have a target sequence database file (.fasta or .faa) to search against?"; then
 read -rp "Enter your HMM profile file (ex. output.hmm): " HMM_PROFILE
