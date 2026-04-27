@@ -35,11 +35,22 @@ fi
 
 # Installing hmmer
 if ask_yes_no "Do you need to install hmmer?"; then
-echo "Installing HMMER suite"
-conda install -y -c bioconda -c conda-forge hmmer && hmmbuild -h | head -3
-echo "HMMER suite installed"
+    echo "Installing HMMER suite, this may take a few minutes..."
+    conda install -y -c bioconda -c conda-forge hmmer
+    # Verify HMMER installed correctly
+    if command -v hmmbuild &> /dev/null; then
+        echo "HMMER suite installed successfully!"
+    else
+        echo "Error: HMMER installation failed. Please contact your administrator."
+        exit 1
+    fi
 else
-echo "Great! Now we can start!"
+    # Verify HMMER is already available
+    if ! command -v hmmbuild &> /dev/null; then
+        echo "Error: HMMER not found. Please re-run the script and answer yes to install HMMER."
+        exit 1
+    fi
+    echo "HMMER found! Now we can start!"
 fi
 
 echo "Starting HMMbuild"
