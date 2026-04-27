@@ -19,3 +19,12 @@ source ~/.bashrc
 
 #7. Verify that nano installed 
 nano --version 
+
+#Clone the repository
+git clone https://github.com/juliafrost-jpg/Autohmmer.git
+
+#Navigate into it
+cd REPO
+
+#Open your file in nano
+nano autohmmercode.zsh
