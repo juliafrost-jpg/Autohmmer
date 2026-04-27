@@ -1,1 +1,21 @@
+#1. Download nano
+wget https://www.nano-editor.org/dist/v7/nano-7.2.tar.gz
 
+#2. Extract it
+tar -xzf nano-7.2.tar.gz
+
+#3. Enter the directory
+cd nano-7.2
+
+#4. Configure for local install
+./configure --prefix=$HOME/.local
+
+#5. Compile and install
+make && make install
+
+#6. Add to your PATH
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+#7. Verify that nano installed 
+nano --version 
