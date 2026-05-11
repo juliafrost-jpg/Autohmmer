@@ -53,6 +53,7 @@ else
     echo "HMMER found! Now we can start!"
 fi
 
+# Asks user if they have a MSA file, if not provides the link to MSA so they can create one
 echo "Starting HMMbuild"
 if ask_yes_no "Do you have a multiple sequence alignment file, this will be .fasta or .faa?"; then
 read -rp "Great, let's begin making your model. Please enter output profile name with .hmm at the end (ex. output.hmm): " HMM_OUT
@@ -64,6 +65,7 @@ else
 echo "Please run a multiple sequence alignment, https://www.ebi.ac.uk/jdispatcher/msa, before proceeding"
 fi
 
+# Tells user HMMsearch is starting, lists files in directory, prompts user for files and searches them
 echo "Starting HMMsearch"
 echo "-------------------------------------------"
 echo "Current directory: $(pwd)"
@@ -84,9 +86,10 @@ echo "Please provide a target sequence database in FASTA format before proceedin
 echo "You can download sequences from: https://www.uniprot.org/ or https://www.ncbi.nlm.nih.gov/"
 fi
 else
-echo "No HMM profile found. Please run HMMbuild first to generate a profile, or provide an existing .hmm file."
+echo "No HMM profile found. Please run HMMbuild first to generate a profile, or provide an existing .hmm file." # Error message if code doesn't work
 fi
 
+# Asks if the user wants a table with the sequences and builds table 
 echo "Starting Sequence Extraction"
 if ask_yes_no "Would you like to extract the matched sequences into an Excel (.xlsx) file?"; then
 
