@@ -6,6 +6,6 @@ This code is written for use in terminal as a nano. Please save the autohmmer co
 
 This code was written with the HMMER 3.4 (Aug 2023) model, if code is not working please check https://hmmer.org/ before proceeding.
 
-This code was written with the assistance of Claude Sonnet 4.6. 
+This code was written with the assistance of Claude Sonnet 4.6. for editing of code and creation of xlsx table. Comments were written by Julia Frost, basically if then statements were wrtitten by Julia Frost. All code was checked/validated by Julia Frost. 
 
 HMMER is freely distributed under the BSD open source license. All HMMER suite tools are from the Howard Hughes Medical Institute. This code is not intented to take credit for HMMER suite tools, only to streamline the process and create an easily accessible output. 
